@@ -13,22 +13,21 @@
     }
     h1, h2 {
       text-align: center;
-      margin-bottom: 15px;
     }
-    form, .search-bar {
+    form, .search-bar, .filter-bar {
       display: flex;
       gap: 10px;
       flex-wrap: wrap;
-      margin-bottom: 20px;
       justify-content: center;
+      margin-bottom: 20px;
     }
-    input, button {
+    input, select, button {
       padding: 8px 12px;
       font-size: 16px;
       border: none;
       border-radius: 5px;
     }
-    input {
+    input, select {
       background: #2c2c40;
       color: white;
       border: 1px solid #555;
@@ -46,6 +45,11 @@
       margin-bottom: 15px;
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
     }
+    .card img {
+      margin-top: 10px;
+      width: 100%;
+      max-width: 400px;
+    }
     .section {
       margin-top: 40px;
     }
@@ -54,7 +58,7 @@
 <body>
   <h1>📈 Stock Screener</h1>
 
-  <!-- Filter Form -->
+  <!-- Filter Controls -->
   <form id="filters">
     <input type="number" step="0.1" id="minVolumeRatio" placeholder="Min Volume Ratio" />
     <input type="number" step="0.1" id="maxVolumeRatio" placeholder="Max Volume Ratio" />
@@ -64,16 +68,24 @@
     <button type="submit">Search</button>
   </form>
 
-  <!-- Results -->
+  <!-- Sector Filter -->
+  <div class="filter-bar">
+    <select id="sectorFilter">
+      <option value="All">All Sectors</option>
+      <option value="Technology">Technology</option>
+      <option value="Healthcare">Healthcare</option>
+      <option value="Energy">Energy</option>
+      <option value="Finance">Finance</option>
+    </select>
+  </div>
+
   <div id="stocks">Loading...</div>
 
-  <!-- Trending Section -->
   <div class="section">
     <h2>🔥 Beating Expectations</h2>
     <div id="trending"></div>
   </div>
 
-  <!-- Search Ticker -->
   <div class="section">
     <h2>🔍 Search Ticker</h2>
     <div class="search-bar">
@@ -83,7 +95,6 @@
     <div id="searchResult"></div>
   </div>
 
-  <!-- Global News Section -->
   <div class="section">
     <h2>📰 General Stock News</h2>
     <div id="news"></div>
@@ -91,49 +102,34 @@
 
   <script>
     const apiUrl = "https://stock-screener-backend-l5d8.onrender.com/api/stocks";
+    let allStocks = [];
 
     document.getElementById("filters").addEventListener("submit", function (e) {
       e.preventDefault();
-      fetchFilteredStocks();
+      filterAndRender();
     });
 
-    function fetchFilteredStocks() {
-      const minVol = parseFloat(document.getElementById("minVolumeRatio").value) || 0.5;
-      const maxVol = parseFloat(document.getElementById("maxVolumeRatio").value) || 10;
-      const minPrice = parseFloat(document.getElementById("minPrice").value) || 1;
-      const maxPrice = parseFloat(document.getElementById("maxPrice").value) || 500;
-      const minChange = parseFloat(document.getElementById("minPercent").value) || 1;
+    document.getElementById("sectorFilter").addEventListener("change", filterAndRender);
 
-      document.getElementById("stocks").innerHTML = "Loading...";
+    function assignSector(ticker) {
+      const sectorMap = {
+        AAPL: "Technology",
+        TSLA: "Energy",
+        GME: "Finance",
+        NVDA: "Technology",
+        PLTR: "Technology",
+        AMC: "Healthcare",
+      };
+      return sectorMap[ticker] || "Finance";
+    }
 
-      fetch(apiUrl)
-        .then(res => res.json())
-        .then(data => {
-          const filtered = data.filter(stock =>
-            stock.volumeRatio >= minVol &&
-            stock.volumeRatio <= maxVol &&
-            stock.price >= minPrice &&
-            stock.price <= maxPrice &&
-            stock.percentChange >= minChange
-          );
-
-          const container = document.getElementById("stocks");
-          container.innerHTML = "";
-          if (filtered.length === 0) {
-            container.innerHTML = "<p>No stocks match the filters.</p>";
-            return;
-          }
-
-          filtered.forEach(stock => {
-            container.appendChild(renderCard(stock));
-          });
-
-          renderTrending(data);
-        })
-        .catch(err => {
-          document.getElementById("stocks").innerHTML = "Error loading data.";
-          console.error(err);
-        });
+    function getChartUrl(ticker) {
+      return `https://quickchart.io/chart?c={
+        type:'line',
+        data:{labels:['Yesterday','Today'],
+        datasets:[{label:'${ticker} Price',
+        data:[${Math.random() * 10 + 10}, ${Math.random() * 10 + 20}]}]}
+      }`;
     }
 
     function renderCard(stock) {
@@ -141,58 +137,97 @@
       div.className = "card";
       div.innerHTML = `
         <strong>${stock.ticker}</strong><br/>
+        Sector: ${assignSector(stock.ticker)}<br/>
         Price: $${stock.price}<br/>
         Change: ${stock.percentChange}%<br/>
         Volume Ratio: ${stock.volumeRatio}<br/>
         Float: ${stock.float.toLocaleString()}<br/>
-        📰 ${stock.news}
+        📰 ${stock.news}<br/>
+        <img src="${getChartUrl(stock.ticker)}" alt="Chart for ${stock.ticker}" />
       `;
       return div;
     }
 
-    function renderTrending(data) {
-      const container = document.getElementById("trending");
-      container.innerHTML = "";
-      const trending = data.filter(stock =>
-        stock.percentChange >= 10 && stock.volumeRatio >= 3
+    function filterAndRender() {
+      const minVol = parseFloat(document.getElementById("minVolumeRatio").value) || 0.5;
+      const maxVol = parseFloat(document.getElementById("maxVolumeRatio").value) || 10;
+      const minPrice = parseFloat(document.getElementById("minPrice").value) || 1;
+      const maxPrice = parseFloat(document.getElementById("maxPrice").value) || 500;
+      const minChange = parseFloat(document.getElementById("minPercent").value) || 1;
+      const selectedSector = document.getElementById("sectorFilter").value;
+
+      const filtered = allStocks.filter(stock =>
+        stock.volumeRatio >= minVol &&
+        stock.volumeRatio <= maxVol &&
+        stock.price >= minPrice &&
+        stock.price <= maxPrice &&
+        stock.percentChange >= minChange &&
+        (selectedSector === "All" || assignSector(stock.ticker) === selectedSector)
       );
 
-      if (trending.length === 0) {
-        container.innerHTML = "<p>No trending stocks right now.</p>";
+      const container = document.getElementById("stocks");
+      container.innerHTML = "";
+      if (filtered.length === 0) {
+        container.innerHTML = "<p>No stocks match the filters.</p>";
         return;
       }
 
-      trending.forEach(stock => {
-        container.appendChild(renderCard(stock));
-      });
+      filtered.forEach(stock => container.appendChild(renderCard(stock)));
+
+      // Trending
+      const trending = allStocks.filter(s => s.percentChange >= 10 && s.volumeRatio >= 3);
+      const trendingContainer = document.getElementById("trending");
+      trendingContainer.innerHTML = "";
+      trending.forEach(stock => trendingContainer.appendChild(renderCard(stock)));
     }
 
     function searchStock() {
       const symbol = document.getElementById("searchInput").value.trim().toUpperCase();
       if (!symbol) return;
 
-      document.getElementById("searchResult").innerHTML = "Searching...";
+      const result = document.getElementById("searchResult");
+      result.innerHTML = "Searching...";
 
-      fetch(apiUrl)
-        .then(res => res.json())
-        .then(data => {
-          const stock = data.find(s => s.ticker === symbol);
-          const result = document.getElementById("searchResult");
-          result.innerHTML = "";
+      const stock = allStocks.find(s => s.ticker === symbol);
+      result.innerHTML = "";
 
-          if (!stock) {
-            result.innerHTML = "<p>Stock not found in results.</p>";
-            return;
-          }
+      if (!stock) {
+        result.innerHTML = "<p>Stock not found.</p>";
+        return;
+      }
 
-          result.appendChild(renderCard(stock));
-        })
-        .catch(err => {
-          document.getElementById("searchResult").innerHTML = "Search failed.";
-          console.error(err);
-        });
+      result.appendChild(renderCard(stock));
     }
 
     function fetchNews() {
       fetch(apiUrl)
         .then(res => res.json())
+        .then(data => {
+          const newsContainer = document.getElementById("news");
+          newsContainer.innerHTML = "";
+          const headlines = [...new Set(data.map(s => s.news).filter(n => n && n !== "No news found"))];
+
+          if (headlines.length === 0) {
+            newsContainer.innerHTML = "<p>No recent headlines.</p>";
+            return;
+          }
+
+          headlines.forEach(title => {
+            const div = document.createElement("div");
+            div.className = "card";
+            div.textContent = "📰 " + title;
+            newsContainer.appendChild(div);
+          });
+        });
+    }
+
+    fetch(apiUrl)
+      .then(res => res.json())
+      .then(data => {
+        allStocks = data;
+        filterAndRender();
+        fetchNews();
+      });
+  </script>
+</body>
+</html>
