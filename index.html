@@ -14,6 +14,15 @@
     h1, h2 {
       text-align: center;
     }
+    .search-bar {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    .search-bar input, .search-bar button {
+      padding: 10px;
+      font-size: 16px;
+    }
     .card {
       background: #2c2c40;
       border: 1px solid #444;
@@ -35,6 +44,11 @@
 <body>
   <h1>📈 Stock Screener</h1>
 
+  <div class="search-bar">
+    <input type="text" id="searchInput" placeholder="Search stock symbol (e.g., AAPL)" />
+    <button onclick="searchStock()">Search</button>
+  </div>
+
   <div class="section">
     <h2>✅ Matched Stocks</h2>
     <div id="matched">Loading...</div>
@@ -45,8 +59,18 @@
     <div id="nearMatch"></div>
   </div>
 
+  <div class="section">
+    <h2>📅 Projected Winners</h2>
+    <div id="projected"></div>
+  </div>
+
+  <div class="section">
+    <h2>🔍 Search Result</h2>
+    <div id="searchResult"></div>
+  </div>
+
   <script>
-    const apiUrl = "https://stock-screener-backend-l5d8.onrender.com/api/stocks";
+    const baseUrl = "https://stock-screener-backend-l5d8.onrender.com";
 
     function getChartUrl(ticker, history) {
       if (!history || history.length < 2) return "";
@@ -88,31 +112,54 @@
       return div;
     }
 
-    fetch(apiUrl)
-      .then(res => res.json())
-      .then(data => {
-        const matchedDiv = document.getElementById("matched");
-        const nearDiv = document.getElementById("nearMatch");
+    function displaySection(sectionId, stocks, emptyMsg) {
+      const container = document.getElementById(sectionId);
+      container.innerHTML = "";
+      if (!stocks || stocks.length === 0) {
+        container.innerHTML = `<p>${emptyMsg}</p>`;
+      } else {
+        stocks.forEach(stock => container.appendChild(renderCard(stock)));
+      }
+    }
 
-        matchedDiv.innerHTML = "";
-        nearDiv.innerHTML = "";
+    function fetchStocks() {
+      fetch(`${baseUrl}/api/stocks`)
+        .then(res => res.json())
+        .then(data => {
+          displaySection("matched", data.matched, "No matched stocks.");
+          displaySection("nearMatch", data.nearMatch, "No near matches.");
+          displaySection("projected", data.projected, "No projected winners.");
+        })
+        .catch(err => {
+          document.getElementById("matched").innerHTML = "Error loading stocks.";
+          console.error(err);
+        });
+    }
 
-        if (data.matched.length === 0) {
-          matchedDiv.innerHTML = "<p>No matched stocks.</p>";
-        } else {
-          data.matched.forEach(stock => matchedDiv.appendChild(renderCard(stock)));
-        }
+    function searchStock() {
+      const symbol = document.getElementById("searchInput").value.trim().toUpperCase();
+      if (!symbol) return;
 
-        if (data.nearMatch.length === 0) {
-          nearDiv.innerHTML = "<p>No near matches found.</p>";
-        } else {
-          data.nearMatch.forEach(stock => nearDiv.appendChild(renderCard(stock)));
-        }
-      })
-      .catch(err => {
-        document.getElementById("matched").innerHTML = "Error loading data.";
-        console.error(err);
-      });
+      const result = document.getElementById("searchResult");
+      result.innerHTML = "Searching...";
+
+      fetch(`${baseUrl}/api/stocks/${symbol}`)
+        .then(res => res.json())
+        .then(stock => {
+          result.innerHTML = "";
+          if (stock.error) {
+            result.innerHTML = `<p>${stock.error}</p>`;
+          } else {
+            result.appendChild(renderCard(stock));
+          }
+        })
+        .catch(err => {
+          result.innerHTML = "Error searching stock.";
+          console.error(err);
+        });
+    }
+
+    fetchStocks();
   </script>
 </body>
 </html>
