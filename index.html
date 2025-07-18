@@ -123,13 +123,37 @@
       return sectorMap[ticker] || "Finance";
     }
 
-    function getChartUrl(ticker) {
-      return `https://quickchart.io/chart?c={
-        type:'line',
-        data:{labels:['Yesterday','Today'],
-        datasets:[{label:'${ticker} Price',
-        data:[${Math.random() * 10 + 10}, ${Math.random() * 10 + 20}]}]}
-      }`;
+    function getChartUrl(ticker, history) {
+      if (!history || history.length < 2) return "";
+
+      const chartConfig = {
+        type: 'line',
+        data: {
+          labels: history.map((_, i) => `Day ${i + 1}`),
+          datasets: [{
+            label: `${ticker} Price`,
+            data: history,
+            fill: false,
+            borderColor: "rgb(75, 192, 192)",
+            tension: 0.1
+          }]
+        },
+        options: {
+          plugins: { legend: { display: false } },
+          scales: {
+            y: {
+              ticks: { color: "white" },
+              grid: { color: "#444" }
+            },
+            x: {
+              ticks: { color: "white" },
+              grid: { color: "#444" }
+            }
+          }
+        }
+      };
+
+      return `https://quickchart.io/chart?c=${encodeURIComponent(JSON.stringify(chartConfig))}`;
     }
 
     function renderCard(stock) {
@@ -143,7 +167,7 @@
         Volume Ratio: ${stock.volumeRatio}<br/>
         Float: ${stock.float.toLocaleString()}<br/>
         📰 ${stock.news}<br/>
-        <img src="${getChartUrl(stock.ticker)}" alt="Chart for ${stock.ticker}" />
+        <img src="${getChartUrl(stock.ticker, stock.history)}" alt="Chart for ${stock.ticker}" />
       `;
       return div;
     }
@@ -162,72 +186,3 @@
         stock.price >= minPrice &&
         stock.price <= maxPrice &&
         stock.percentChange >= minChange &&
-        (selectedSector === "All" || assignSector(stock.ticker) === selectedSector)
-      );
-
-      const container = document.getElementById("stocks");
-      container.innerHTML = "";
-      if (filtered.length === 0) {
-        container.innerHTML = "<p>No stocks match the filters.</p>";
-        return;
-      }
-
-      filtered.forEach(stock => container.appendChild(renderCard(stock)));
-
-      // Trending
-      const trending = allStocks.filter(s => s.percentChange >= 10 && s.volumeRatio >= 3);
-      const trendingContainer = document.getElementById("trending");
-      trendingContainer.innerHTML = "";
-      trending.forEach(stock => trendingContainer.appendChild(renderCard(stock)));
-    }
-
-    function searchStock() {
-      const symbol = document.getElementById("searchInput").value.trim().toUpperCase();
-      if (!symbol) return;
-
-      const result = document.getElementById("searchResult");
-      result.innerHTML = "Searching...";
-
-      const stock = allStocks.find(s => s.ticker === symbol);
-      result.innerHTML = "";
-
-      if (!stock) {
-        result.innerHTML = "<p>Stock not found.</p>";
-        return;
-      }
-
-      result.appendChild(renderCard(stock));
-    }
-
-    function fetchNews() {
-      fetch(apiUrl)
-        .then(res => res.json())
-        .then(data => {
-          const newsContainer = document.getElementById("news");
-          newsContainer.innerHTML = "";
-          const headlines = [...new Set(data.map(s => s.news).filter(n => n && n !== "No news found"))];
-
-          if (headlines.length === 0) {
-            newsContainer.innerHTML = "<p>No recent headlines.</p>";
-            return;
-          }
-
-          headlines.forEach(title => {
-            const div = document.createElement("div");
-            div.className = "card";
-            div.textContent = "📰 " + title;
-            newsContainer.appendChild(div);
-          });
-        });
-    }
-
-    fetch(apiUrl)
-      .then(res => res.json())
-      .then(data => {
-        allStocks = data;
-        filterAndRender();
-        fetchNews();
-      });
-  </script>
-</body>
-</html>
