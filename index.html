@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Stock Screener</title>
+    <style>
+      body { font-family: Arial; padding: 20px; background: #f7f7f7; }
+      .card { background: #fff; padding: 15px; margin-bottom: 10px; border-radius: 6px; box-shadow: 0 0 10px #ddd; }
+    </style>
+  </head>
+  <body>
+    <h1>📈 Hot Stocks Screener</h1>
+    <div id="stocks">Loading...</div>
+
+    <script>
+      fetch("https://stock-screener-backend-l5d8.onrender.com/api/stocks")
+        .then(res => res.json())
+        .then(data => {
+          const container = document.getElementById("stocks");
+          if (data.length === 0) {
+            container.innerHTML = "<p>No qualifying stocks found.</p>";
+            return;
+          }
+          container.innerHTML = "";
+          data.forEach(stock => {
+            const div = document.createElement("div");
+            div.className = "card";
+            div.innerHTML = `
+              <strong>${stock.ticker}</strong><br>
+              Price: $${stock.price}<br>
+              Change: ${stock.percentChange}%<br>
+              Volume Ratio: ${stock.volumeRatio}<br>
+              Float: ${stock.float.toLocaleString()}<br>
+              📰 ${stock.news}
+            `;
+            container.appendChild(div);
+          });
+        })
+        .catch(err => {
+          document.getElementById("stocks").innerHTML = "Error loading stock data.";
+          console.error(err);
+        });
+    </script>
+  </body>
+</html>
